@@ -64,11 +64,8 @@ You receive a confidence score along with suggested next steps.
 
 Optionally, you can chat with an AI or book an appointment with a doctor.
 
-📄 License
-This project is licensed under the MIT License.
-See LICENSE for more information.
 
-📬 Contact
+# 📬 Contact
 Have questions or suggestions?
 
 📧 Email: thanhhbao4123@gmail.com
