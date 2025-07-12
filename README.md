@@ -40,7 +40,7 @@ SkinAI is an intelligent web-based platform that leverages artificial intelligen
 ## 📦 Installation
 
 ```bash
-git clone https://github.com/your-username/skinai.git
+git clone https://github.com/thanhhbao/ai-healthcare.git
 ```
 Install frontend dependencies
 ```
