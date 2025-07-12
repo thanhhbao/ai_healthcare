@@ -2,7 +2,7 @@
 
 SkinAI is an intelligent web-based platform that leverages artificial intelligence to **detect skin cancer** from uploaded skin lesion images. It also provides **online consultations**, **appointment scheduling**, and access to **natural treatment options** — helping users take control of their skin health from anywhere, at any time.
 
-🌐 Live demo: [https://ai-healthcare-five.vercel.app]
+🌐 Live demo: https://ai-healthcare-five.vercel.app
 
 ---
 
