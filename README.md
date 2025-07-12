@@ -26,12 +26,14 @@ SkinAI is an intelligent web-based platform that leverages artificial intelligen
 
 ---
 
-## 🛠 Tech Stack
+## 🛠️ Tech Stack
 
-- **Frontend**: React.js + Next.js
-- **Backend**: Node.js (API routes or Vercel Functions)
-- **AI Model**: TensorFlow / PyTorch (image classification)
-- **Deployment**: Vercel
+| Layer         | Technology              |
+|---------------|--------------------------|
+| Frontend      | Next.js + TypeScript     |
+| Backend API   | FastAPI (Python)         |
+| AI/ML Model   | PyTorch (Skin cancer classifier) |
+| Deployment    | Vercel (Frontend) + Render/Cloud (Backend API)
 
 ---
 
@@ -40,12 +42,18 @@ SkinAI is an intelligent web-based platform that leverages artificial intelligen
 ```bash
 git clone https://github.com/your-username/skinai.git
 ```
+Install frontend dependencies
 ```
+cd ai_healthcare
 npm install
 ```
-Then run the development server:
+Run frontend locally
 ```
 npm run dev
+```
+Run backend (FastAPI + PyTorch)
+```
+Updating...
 ```
 # How It Works
 Upload an image of your skin lesion.
