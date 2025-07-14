@@ -1,32 +1,32 @@
-# 🧠 SkinAI – AI-Powered Skin Cancer Detection
+# SkinAI – AI-Powered Skin Cancer Detection
 
 SkinAI is an intelligent web-based platform that leverages artificial intelligence to **detect skin cancer** from uploaded skin lesion images. It also provides **online consultations**, **appointment scheduling**, and access to **natural treatment options** — helping users take control of their skin health from anywhere, at any time.
 
-🌐 Live demo: https://ai-healthcare-five.vercel.app
+Live demo: https://ai-healthcare-five.vercel.app
 
 ---
 
-## 🚀 Features
+## Features
 
 - 🩺 **Skin Cancer Detection**
   - Upload a skin image and get AI-powered classification (e.g., benign, malignant).
   - Powered by deep learning and image classification models.
   
-- 💬 **AI Health Chatbot**
+-  **AI Health Chatbot**
   - Chat with an AI assistant trained on medical dialogue to answer health-related queries.
   
-- 📅 **Online Appointment Booking**
+-  **Online Appointment Booking**
   - Easily schedule appointments with real doctors or dermatologists.
 
-- 🌿 **Natural Treatment Explorer**
+-  **Natural Treatment Explorer**
   - Discover holistic and alternative treatments for skin conditions.
 
-- 📱 **Responsive Design**
+-  **Responsive Design**
   - Fully responsive on desktop, tablet, and mobile devices.
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 | Layer         | Technology              |
 |---------------|--------------------------|
@@ -37,7 +37,7 @@ SkinAI is an intelligent web-based platform that leverages artificial intelligen
 
 ---
 
-## 📦 Installation
+## Installation
 
 ```bash
 git clone https://github.com/thanhhbao/ai_healthcare.git
@@ -65,7 +65,7 @@ You receive a confidence score along with suggested next steps.
 Optionally, you can chat with an AI or book an appointment with a doctor.
 
 
-# 📬 Contact
+#  Contact
 Have questions or suggestions?
 
-📧 Email: thanhhbao4123@gmail.com
+ Email: thanhhbao4123@gmail.com
