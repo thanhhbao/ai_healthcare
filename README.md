@@ -8,7 +8,7 @@ Live demo: https://ai-healthcare-five.vercel.app
 
 ## Features
 
-- 🩺 **Skin Cancer Detection**
+-  **Skin Cancer Detection**
   - Upload a skin image and get AI-powered classification (e.g., benign, malignant).
   - Powered by deep learning and image classification models.
   
