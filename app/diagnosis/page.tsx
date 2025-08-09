@@ -1,13 +1,11 @@
 'use client';
 import * as ort from 'onnxruntime-web';
 
-// CẤU HÌNH SỚM: chạy ngay khi file được load
-if (typeof window !== 'undefined') {
-  ort.env.wasm.wasmPaths = '/ort/'; // trỏ đến public/ort
-  ort.env.wasm.numThreads = 1;      // ép 1 luồng để khỏi cần COOP/COEP
-  // Nếu vẫn lỗi, thử tắt SIMD:
-  // ort.env.wasm.simd = false;
-}
+ort.env.debug = true;              // giúp log rõ hơn trong console
+ort.env.wasm.wasmPaths = '/ort/';  // dùng file local trong public/ort
+ort.env.wasm.numThreads = 1;       // ép không dùng threaded (khỏi cần COOP/COEP)
+ort.env.wasm.simd = false;         // chắc chắn không chọn biến thể threaded
+
 
 import type React from "react";
 import { useState, useRef, useEffect } from "react";
@@ -126,11 +124,7 @@ export default function DiagnosisPage() {
   });
 }
 
-// (khuyến nghị) trỏ đường dẫn .wasm ổn định từ CDN
-if (typeof window !== 'undefined') {
-  // nhớ giữ version khớp với package bạn cài
-  ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/';
-}
+
 
 // HEAD check để báo lỗi thân thiện nếu file sai/nhỏ bất thường
 async function ensureHead(url: string, minMB = 50) {
@@ -191,6 +185,12 @@ async function fetchModelBytes(url: string, tries = 3): Promise<Uint8Array> {
   try {
     // 1) Tạo/tái dùng session ONNX
     if (!sessionRef.current) {
+      console.log('ORT cfg', {
+  wasmPaths: ort.env.wasm.wasmPaths,
+  numThreads: ort.env.wasm.numThreads,
+  simd: ort.env.wasm.simd,
+});
+
       sessionRef.current = await ort.InferenceSession.create("/models/ConvNeXtV2_v2.onnx", {
         executionProviders: ["wasm"], // hoặc ["webgl"] nếu muốn
       });
