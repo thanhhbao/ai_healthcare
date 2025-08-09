@@ -1,6 +1,14 @@
 'use client';
-
 import * as ort from 'onnxruntime-web';
+
+// CẤU HÌNH SỚM: chạy ngay khi file được load
+if (typeof window !== 'undefined') {
+  ort.env.wasm.wasmPaths = '/ort/'; // trỏ đến public/ort
+  ort.env.wasm.numThreads = 1;      // ép 1 luồng để khỏi cần COOP/COEP
+  // Nếu vẫn lỗi, thử tắt SIMD:
+  // ort.env.wasm.simd = false;
+}
+
 import type React from "react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -27,11 +35,7 @@ export default function DiagnosisPage() {
   const [error, setError] = useState<string | null>(null);
   const sessionRef = useRef<ort.InferenceSession | null>(null);
 
-  if (typeof window !== 'undefined') {
-  ort.env.wasm.wasmPaths = '/ort/'; // trỏ tới thư mục public/ort
-  // tận dụng multi-thread khi đã có COOP/COEP
-  // ort.env.wasm.numThreads = Math.max(1, (navigator.hardwareConcurrency || 2) - 1);
-}
+
 
 
   // cleanup preview URL
