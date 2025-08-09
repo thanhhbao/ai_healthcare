@@ -116,6 +116,40 @@ export default function DiagnosisPage() {
   });
 }
 
+// (khuyến nghị) trỏ đường dẫn .wasm ổn định từ CDN
+if (typeof window !== 'undefined') {
+  // nhớ giữ version khớp với package bạn cài
+  ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/';
+}
+
+// HEAD check để báo lỗi thân thiện nếu file sai/nhỏ bất thường
+async function ensureHead(url: string, minMB = 50) {
+  const r = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+  if (!r.ok) throw new Error(`Không truy cập được model: ${r.status} ${r.statusText}`);
+  const len = Number(r.headers.get('content-length') || 0);
+  if (len < minMB * 1024 * 1024) throw new Error(`Model quá nhỏ (${len} bytes)`);
+}
+
+// Prefetch model về bytes + retry (tránh lỗi 404/502 nhất thời)
+async function fetchModelBytes(url: string, tries = 3): Promise<Uint8Array> {
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`Fetch model fail: ${r.status} ${r.statusText}`);
+      const buf = await r.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      if (bytes.byteLength < 1024 * 1024) {
+        throw new Error(`Model quá nhỏ: ${bytes.byteLength} bytes`);
+      }
+      return bytes;
+    } catch (e) {
+      lastErr = e;
+      await new Promise(res => setTimeout(res, 600 * (i + 1))); // backoff 0.6s, 1.2s, 1.8s
+    }
+  }
+  throw lastErr;
+}
 
   const handleAnalyze = async () => {
   if (!selectedFile) {
