@@ -200,7 +200,7 @@ async function fetchModelBytes(url: string, tries = 3): Promise<Uint8Array> {
       simd: ort.env.wasm.simd,
     });
 
-    const MODEL_URL = '/models/ConvNeXtV2.onnx'; // hoặc tên file bạn đang dùng
+    const MODEL_URL = '/models/ConvNeXtV2_v2.onnx'; 
     await ensureHead(MODEL_URL, 50);
 
     // Tạo/tái dùng session
