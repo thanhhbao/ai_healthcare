@@ -27,6 +27,12 @@ export default function DiagnosisPage() {
   const [error, setError] = useState<string | null>(null);
   const sessionRef = useRef<ort.InferenceSession | null>(null);
 
+  if (typeof window !== 'undefined') {
+  ort.env.wasm.wasmPaths = '/ort/'; // trỏ tới thư mục public/ort
+  // tận dụng multi-thread khi đã có COOP/COEP
+  // ort.env.wasm.numThreads = Math.max(1, (navigator.hardwareConcurrency || 2) - 1);
+}
+
 
   // cleanup preview URL
   useEffect(() => {
@@ -181,7 +187,7 @@ async function fetchModelBytes(url: string, tries = 3): Promise<Uint8Array> {
   try {
     // 1) Tạo/tái dùng session ONNX
     if (!sessionRef.current) {
-      sessionRef.current = await ort.InferenceSession.create("/models/ConvNeXtV2.onnx", {
+      sessionRef.current = await ort.InferenceSession.create("/models/ConvNeXtV2_v2.onnx", {
         executionProviders: ["wasm"], // hoặc ["webgl"] nếu muốn
       });
       // ví dụ tuỳ chọn: ort.env.wasm.numThreads = Math.max(1, (navigator.hardwareConcurrency || 2) - 1);
