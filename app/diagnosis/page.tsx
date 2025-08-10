@@ -1,20 +1,5 @@
 'use client';
 import type * as OrtType from 'onnxruntime-web';
-
-// Đảm bảo cấu hình được áp trước khi module ORT load
-const ortPromise: Promise<typeof import('onnxruntime-web')> = (async () => {
-  if (typeof window !== 'undefined') {
-    (globalThis as any).ortWasm = {
-      wasmPaths: '/ort/',   // dùng file trong public/ort
-      numThreads: 1,        // ép single-thread, khỏi cần COOP/COEP
-      simd: false,          // tránh chọn biến thể threaded
-    };
-  }
-  return import('onnxruntime-web');   // dynamic import SAU khi đã set cấu hình
-})();
-
-
-
 import type React from "react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +8,21 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Upload, Brain, Camera, AlertTriangle, CheckCircle, Info, ArrowRight } from "lucide-react";
 
+/* ===================== ORT PRELOAD (trước khi import) ===================== */
+const ortPromise: Promise<typeof import('onnxruntime-web')> = (async () => {
+  if (typeof window !== 'undefined') {
+    (globalThis as any).ortWasm = {
+      wasmPaths: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/',
+      numThreads: 1,
+      simd: false,
+    };
+    console.log('preload ORT cfg', (globalThis as any).ortWasm);
+  }
+  return import('onnxruntime-web');
+})();
+
+
+/* ===================== UI/Types ===================== */
 interface DiagnosisResult {
   riskLevel: "low" | "moderate" | "high";
   confidence: number;
@@ -31,60 +31,19 @@ interface DiagnosisResult {
   nextSteps: string[];
 }
 
-export default function DiagnosisPage() {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [result, setResult] = useState<DiagnosisResult | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [error, setError] = useState<string | null>(null);
-  const sessionRef = useRef<OrtType.InferenceSession | null>(null);
+/* ===================== Utils ===================== */
+function softmax(input: number[] | Float32Array): number[] {
+  const arr = Array.from(input);
+  const m = Math.max(...arr);
+  const exps = arr.map(x => Math.exp(x - m));
+  const s = exps.reduce((a, b) => a + b, 0);
+  return exps.map(x => x / s);
+}
 
-
-
-
-
-  // cleanup preview URL
-  useEffect(() => {
-    return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); };
-  }, [previewUrl]);
-
-  function softmax(input: number[] | Float32Array): number[] {
-    const arr = Array.from(input);
-    const max = Math.max(...arr);
-    const exps = arr.map((x) => Math.exp(x - max));
-    const sum = exps.reduce((a, b) => a + b, 0);
-    return exps.map((x) => x / sum);
-  }
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-
-    if (file) {
-      setSelectedFile(file);
-      setResult(null);
-      setError(null);
-      setAnalysisProgress(0);
-      setIsAnalyzing(false);
-      setPreviewUrl(URL.createObjectURL(file));
-    } else if (!selectedFile) {
-      setSelectedFile(null);
-      setResult(null);
-      setError(null);
-      setAnalysisProgress(0);
-      setIsAnalyzing(false);
-      setPreviewUrl(null);
-    }
-  };
-
-  async function preprocessImage(file: File): Promise<Float32Array> {
+async function preprocessImage(file: File): Promise<Float32Array> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
     const reader = new FileReader();
-
     reader.onload = () => {
       if (typeof reader.result === "string") img.src = reader.result;
       else reject("Could not read image");
@@ -94,8 +53,6 @@ export default function DiagnosisPage() {
 
     img.onload = () => {
       const target = 224;
-
-      // Scale giữ tỉ lệ để cạnh nhỏ = 224
       const scale = Math.max(target / img.width, target / img.height);
       const w = Math.round(img.width * scale);
       const h = Math.round(img.height * scale);
@@ -108,7 +65,6 @@ export default function DiagnosisPage() {
       canvas.height = h;
       ctx.drawImage(img, 0, 0, w, h);
 
-      // Center-crop về 224x224
       const sx = Math.floor((w - target) / 2);
       const sy = Math.floor((h - target) / 2);
       const { data } = ctx.getImageData(sx, sy, target, target);
@@ -133,17 +89,15 @@ export default function DiagnosisPage() {
   });
 }
 
-
-
-// HEAD check để báo lỗi thân thiện nếu file sai/nhỏ bất thường
-async function ensureHead(url: string, minMB = 50) {
+// HEAD check (ngưỡng hợp lý ~1MB, đừng để quá cao)
+async function ensureHead(url: string, minMB = 1) {
   const r = await fetch(url, { method: 'HEAD', cache: 'no-store' });
   if (!r.ok) throw new Error(`Không truy cập được model: ${r.status} ${r.statusText}`);
   const len = Number(r.headers.get('content-length') || 0);
   if (len < minMB * 1024 * 1024) throw new Error(`Model quá nhỏ (${len} bytes)`);
 }
 
-// Prefetch model về bytes + retry (tránh lỗi 404/502 nhất thời)
+// Prefetch model (ngưỡng tối thiểu ~200KB để bắt lỗi file rỗng)
 async function fetchModelBytes(url: string, tries = 3): Promise<Uint8Array> {
   let lastErr: unknown;
   for (let i = 0; i < tries; i++) {
@@ -152,155 +106,184 @@ async function fetchModelBytes(url: string, tries = 3): Promise<Uint8Array> {
       if (!r.ok) throw new Error(`Fetch model fail: ${r.status} ${r.statusText}`);
       const buf = await r.arrayBuffer();
       const bytes = new Uint8Array(buf);
-      if (bytes.byteLength < 1024 * 1024) {
+      if (bytes.byteLength < 200 * 1024) {
         throw new Error(`Model quá nhỏ: ${bytes.byteLength} bytes`);
       }
       return bytes;
     } catch (e) {
       lastErr = e;
-      await new Promise(res => setTimeout(res, 600 * (i + 1))); // backoff 0.6s, 1.2s, 1.8s
+      await new Promise(res => setTimeout(res, 600 * (i + 1)));
     }
   }
   throw lastErr;
 }
 
+/* ===================== Page ===================== */
+export default function DiagnosisPage() {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [result, setResult] = useState<DiagnosisResult | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const sessionRef = useRef<OrtType.InferenceSession | null>(null);
+
+  // cleanup preview URL
+  useEffect(() => {
+    return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); };
+  }, [previewUrl]);
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+
+    if (file) {
+      setSelectedFile(file);
+      setResult(null);
+      setError(null);
+      setAnalysisProgress(0);
+      setIsAnalyzing(false);
+      setPreviewUrl(URL.createObjectURL(file));
+    } else if (!selectedFile) {
+      setSelectedFile(null);
+      setResult(null);
+      setError(null);
+      setAnalysisProgress(0);
+      setIsAnalyzing(false);
+      setPreviewUrl(null);
+    }
+  };
+
   const handleAnalyze = async () => {
-  if (!selectedFile) {
-    setError("Please select an image file to analyze.");
-    return;
-  }
-
-  setIsAnalyzing(true);
-  setAnalysisProgress(0);
-  setError(null);
-
-  const progressInterval = setInterval(() => {
-    setAnalysisProgress((prev) => {
-      if (prev >= 95) {
-        clearInterval(progressInterval);
-        return 95;
-      }
-      return prev + Math.random() * 10;
-    });
-  }, 200);
-
-  const SCAN_ONE_PASS_MS = 900;
-  const MIN_SCANS = 2;
-  const MIN_SCAN_TIME = SCAN_ONE_PASS_MS * MIN_SCANS;
-  const start = performance.now();
-
-  try {
-    // Luôn lấy ort trước (ngoài mọi if) để dùng bên dưới
-    const ort = await ortPromise;
-
-    // Log cấu hình để chắc chắn không còn threaded/CDN
-    console.log('ORT cfg', {
-      wasmPaths: ort.env.wasm.wasmPaths,
-      numThreads: ort.env.wasm.numThreads,
-      simd: ort.env.wasm.simd,
-    });
-
-    const MODEL_URL = '/models/ConvNeXtV2_v2.onnx'; 
-    await ensureHead(MODEL_URL, 50);
-
-    // Tạo/tái dùng session
-    if (!sessionRef.current) {
-      const modelBytes = await fetchModelBytes(MODEL_URL, 3);
-      sessionRef.current = await ort.InferenceSession.create(modelBytes, {
-        executionProviders: ['wasm'],
-      });
-    }
-    const session = sessionRef.current!;
-
-    // Tiền xử lý ảnh -> tensor
-    const imageData = await preprocessImage(selectedFile);
-    const inputName  = session.inputNames[0];
-    const outputName = session.outputNames[0];
-    const inputTensor = new ort.Tensor('float32', imageData, [1, 3, 224, 224]);
-
-    // Chạy inference
-    const outputs = await session.run({ [inputName]: inputTensor });
-    const logits = outputs[outputName].data as Float32Array;
-
-    // Softmax -> xác suất
-    const probabilities = softmax(logits);
-
-    // NOTE: Thứ tự class phải ĐÚNG như lúc train/export ONNX.
-    // Nếu chưa chắc, tạm thời để ['benign','malignant'] rồi kiểm chứng trên ảnh mẫu.
-    const classNames = ['benign', 'malignant'];
-
-    const maxP = Math.max(...probabilities);
-    const predictedIndex = probabilities.indexOf(maxP);
-    const prediction = classNames[predictedIndex];
-    const confidence = parseFloat((maxP * 100).toFixed(2));
-
-    const newResult: DiagnosisResult = {
-      riskLevel: prediction === 'malignant' ? 'high' : 'low',
-      confidence,
-      findings: [],
-      recommendations: [],
-      nextSteps: [],
-    };
-
-    if (prediction === 'malignant') {
-      newResult.findings = [
-        'AI analysis indicates a high probability of malignancy.',
-        'Significant irregularities in shape, border, or color were detected.',
-        'Immediate medical consultation is crucial.',
-      ];
-      newResult.recommendations = [
-        'Schedule an urgent appointment with a certified dermatologist.',
-        'Avoid any manipulation or self-treatment of the lesion.',
-        'Protect the area from sun exposure.',
-      ];
-      newResult.nextSteps = [
-        'Book a biopsy appointment as recommended by a specialist.',
-        'Gather relevant medical history for your doctor.',
-        'Monitor for rapid changes in the lesion.',
-      ];
-    } else {
-      newResult.findings = [
-        'AI analysis suggests a benign (non-cancerous) lesion.',
-        'Characteristics appear consistent with a common mole or benign growth.',
-        'No immediate signs of concern were identified.',
-      ];
-      newResult.recommendations = [
-        'Continue routine self-skin checks.',
-        'Practice sun safety (sunscreen, protective clothing).',
-        'Consult a dermatologist if you notice any changes or have concerns.',
-      ];
-      newResult.nextSteps = [
-        'Schedule annual skin examinations with a dermatologist.',
-        'Keep digital photos for comparison over time.',
-        'Educate yourself on skin cancer prevention.',
-      ];
+    if (!selectedFile) {
+      setError("Please select an image file to analyze.");
+      return;
     }
 
-    if (confidence < 70) {
-      newResult.riskLevel = 'moderate';
-      newResult.findings.push('Note: AI confidence is moderate. Human expert review is recommended.');
-      newResult.recommendations.push('Consider seeking a second opinion or additional tests.');
-    }
-
-    // Đợi đủ thời gian quét tối thiểu
-    const elapsed = performance.now() - start;
-    const waitMore = Math.max(0, MIN_SCAN_TIME - elapsed);
-    if (waitMore > 0) await new Promise((res) => setTimeout(res, waitMore));
-
-    clearInterval(progressInterval);
-    setAnalysisProgress(100);
-    setResult(newResult);
-    setIsAnalyzing(false);
-  } catch (err: any) {
-    clearInterval(progressInterval);
-    setIsAnalyzing(false);
+    setIsAnalyzing(true);
     setAnalysisProgress(0);
-    console.error('Error running analysis:', err);
-    setError(err.message || 'Unknown error during model analysis.');
-  }
-};
+    setError(null);
+    setResult(null);
 
+    // Progress giả lập
+    let running = true;
+    const startTime = performance.now();
+    (async () => {
+      while (running) {
+        const elapsed = performance.now() - startTime;
+        const est = Math.min(95, 10 + elapsed / 20);
+        setAnalysisProgress(est);
+        await new Promise(r => setTimeout(r, 120));
+      }
+    })();
 
+    try {
+      // 1) Import ORT (đảm bảo đã preload)
+      const ort = await ortPromise;
+
+      // 2) ÉP lại env ngay trước khi tạo session (an toàn với HMR)
+      (ort.env.wasm as any).wasmUrls = (globalThis as any).ortWasm.wasmUrls;
+      ort.env.wasm.numThreads = 1;
+      ort.env.wasm.simd = false;
+       ort.env.wasm.wasmPaths = '/ort/'; // optional khi đã map wasmUrls
+
+      console.log('ORT env after import', {
+        wasmPaths: ort.env.wasm.wasmPaths,
+        numThreads: ort.env.wasm.numThreads,
+        simd: ort.env.wasm.simd,
+        // @ts-ignore
+        wasmUrls: (ort.env.wasm as any).wasmUrls,
+      });
+
+      // 3) Kiểm tra & load model
+      const MODEL_URL = '/models/ConvNeXtV2_v2.onnx';
+      await ensureHead(MODEL_URL, 1);
+      if (!sessionRef.current) {
+        const modelBytes = await fetchModelBytes(MODEL_URL, 3);
+        sessionRef.current = await ort.InferenceSession.create(modelBytes, {
+          executionProviders: ['wasm'],
+        });
+      }
+      const session = sessionRef.current!;
+
+      // 4) Tiền xử lý ảnh
+      const imageData = await preprocessImage(selectedFile);
+      const inputTensor = new ort.Tensor('float32', imageData, [1, 3, 224, 224]);
+
+      // 5) Chạy inference
+      const outputs = await session.run({ [session.inputNames[0]]: inputTensor });
+      const logits = outputs[session.outputNames[0]].data as Float32Array;
+      const probabilities = softmax(logits);
+
+      // 6) Mapping class (chỉnh theo model thật của bạn)
+      const classNames = [ 'malignant','benign'];
+      const maxP = Math.max(...probabilities);
+      const predictedIndex = probabilities.indexOf(maxP);
+      const prediction = classNames[predictedIndex];
+      const confidence = parseFloat((maxP * 100).toFixed(2));
+
+      const newResult: DiagnosisResult = {
+        riskLevel: prediction === 'malignant' ? 'high' : 'low',
+        confidence,
+        findings: [],
+        recommendations: [],
+        nextSteps: [],
+      };
+
+      if (prediction === 'malignant') {
+        newResult.findings = [
+          'AI analysis indicates a high probability of malignancy.',
+          'Significant irregularities in shape, border, or color were detected.',
+          'Immediate medical consultation is crucial.',
+        ];
+        newResult.recommendations = [
+          'Schedule an urgent appointment with a certified dermatologist.',
+          'Avoid any manipulation or self-treatment of the lesion.',
+          'Protect the area from sun exposure.',
+        ];
+        newResult.nextSteps = [
+          'Book a biopsy appointment as recommended by a specialist.',
+          'Gather relevant medical history for your doctor.',
+          'Monitor for rapid changes in the lesion.',
+        ];
+      } else {
+        newResult.findings = [
+          'AI analysis suggests a benign (non-cancerous) lesion.',
+          'Characteristics appear consistent with a common mole or benign growth.',
+          'No immediate signs of concern were identified.',
+        ];
+        newResult.recommendations = [
+          'Continue routine self-skin checks.',
+          'Practice sun safety (sunscreen, protective clothing).',
+          'Consult a dermatologist if you notice any changes or have concerns.',
+        ];
+        newResult.nextSteps = [
+          'Schedule annual skin examinations with a dermatologist.',
+          'Keep digital photos for comparison over time.',
+          'Educate yourself on skin cancer prevention.',
+        ];
+      }
+
+      if (confidence < 70) {
+        newResult.riskLevel = 'moderate';
+        newResult.findings.push('Note: AI confidence is moderate. Human expert review is recommended.');
+        newResult.recommendations.push('Consider seeking a second opinion or additional tests.');
+      }
+
+      // 7) Kết thúc
+      running = false;
+      setAnalysisProgress(100);
+      setResult(newResult);
+    } catch (err: any) {
+      running = false;
+      setAnalysisProgress(0);
+      console.error('Error running analysis:', err);
+      setError(err.message || 'Unknown error during model analysis.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const getRiskIcon = (risk: string) => {
     switch (risk) {
