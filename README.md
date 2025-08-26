@@ -17,7 +17,7 @@ The platform also includes additional healthcare-related features such as appoin
 ## Features
 
 - Upload skin lesion images for AI-based analysis directly in the browser.
-- Powered by EfficientViT / ConvNeXtV2 models exported to ONNX format.
+- Powered by ConvNeXtV2 models exported to ONNX format.
 - Privacy-preserving: all processing is performed locally, with no server upload.
 - Healthcare features:
   - Appointments booking & management
