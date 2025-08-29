@@ -216,8 +216,8 @@ export default function DiagnosisPage() {
       const logits = outputs[session.outputNames[0]].data as Float32Array;
       const probabilities = softmax(logits);
 
-      // 6) Mapping class (chỉnh theo model thật của bạn)
-      const classNames = [ 'malignant','benign'];
+      // 6) Mapping class 
+      const classNames = [ 'benign','malignant',];
       const maxP = Math.max(...probabilities);
       const predictedIndex = probabilities.indexOf(maxP);
       const prediction = classNames[predictedIndex];
